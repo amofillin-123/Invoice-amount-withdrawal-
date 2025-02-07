@@ -63,6 +63,3 @@ def process_files():
         'calculation': calculation,
         'total': total_amount
     })
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5006)
