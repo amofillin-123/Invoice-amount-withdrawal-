@@ -35,6 +35,24 @@
             margin-top: 20px;
             display: none;
         }
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .file-count {
+            background-color: #e3f2fd;
+            padding: 5px 10px;
+            border-radius: 4px;
+            color: #1976d2;
+            font-size: 0.9em;
+        }
         .file-list {
             margin-top: 20px;
             max-height: 200px;
@@ -55,19 +73,38 @@
             color: #f44336;
             margin-top: 10px;
         }
+        .reset-button {
+            background-color: #ff5252;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s;
+        }
+        .reset-button:hover {
+            background-color: #ff1744;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>电子发票金额提取器</h1>
         <div class="drop-zone" id="dropZone">
-            <p>拖拽PDF文件到此处（最多100个文件）</p>
+            <p>拖拽PDF文件或文件夹到此处（最多100个文件）</p>
             <p>或点击选择文件</p>
-            <input type="file" id="fileInput" multiple accept=".pdf" style="display: none;">
+            <input type="file" id="fileInput" multiple accept=".pdf" webkitdirectory directory style="display: none;">
         </div>
         <div id="error" class="error"></div>
         <div id="results" class="results">
-            <h2>提取结果</h2>
+            <div class="results-header">
+                <h2>提取结果</h2>
+                <div class="header-right">
+                    <div class="file-count">已处理文件数：<span id="fileCount">0</span></div>
+                    <button id="resetButton" class="reset-button">重置</button>
+                </div>
+            </div>
             <div id="fileList" class="file-list"></div>
             <div class="calculation">
                 <p>计算过程：<span id="calculation"></span></p>
@@ -84,6 +121,12 @@
         const calculation = document.getElementById('calculation');
         const total = document.getElementById('total');
         const error = document.getElementById('error');
+        const fileCount = document.getElementById('fileCount');
+        const resetButton = document.getElementById('resetButton');
+
+        // 存储所有已处理的文件名
+        let processedFiles = [];
+        let currentTotal = 0;
 
         // 处理拖拽事件
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -112,34 +155,82 @@
         dropZone.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', handleFileSelect);
 
-        function handleDrop(e) {
-            const files = Array.from(e.dataTransfer.files);
+        // 递归获取所有PDF文件
+        async function getAllPdfFiles(items) {
+            const files = [];
+            
+            async function traverseFileTree(item) {
+                if (item.isFile) {
+                    if (item.name.toLowerCase().endsWith('.pdf')) {
+                        const file = await new Promise((resolve) => item.file(resolve));
+                        files.push(file);
+                    }
+                } else if (item.isDirectory) {
+                    const dirReader = item.createReader();
+                    const entries = await new Promise((resolve) => {
+                        const results = [];
+                        function readEntries() {
+                            dirReader.readEntries(async (entries) => {
+                                if (entries.length === 0) {
+                                    resolve(results);
+                                } else {
+                                    results.push(...entries);
+                                    readEntries();
+                                }
+                            });
+                        }
+                        readEntries();
+                    });
+                    
+                    for (const entry of entries) {
+                        await traverseFileTree(entry);
+                    }
+                }
+            }
+
+            for (const item of items) {
+                const entry = item.webkitGetAsEntry();
+                if (entry) {
+                    await traverseFileTree(entry);
+                }
+            }
+
+            return files;
+        }
+
+        async function handleDrop(e) {
+            const items = e.dataTransfer.items;
+            const files = await getAllPdfFiles(items);
             processFiles(files);
         }
 
         function handleFileSelect(e) {
-            const files = Array.from(e.target.files);
+            const files = Array.from(e.target.files).filter(file => 
+                file.name.toLowerCase().endsWith('.pdf')
+            );
             processFiles(files);
         }
 
         function processFiles(files) {
             error.textContent = '';
             
-            // 验证文件数量
-            if (files.length > 100) {
-                error.textContent = '最多只能上传100个文件';
+            // 验证新添加的文件
+            const newFiles = files.filter(file => !processedFiles.includes(file.name));
+            
+            // 检查总文件数是否超过限制
+            if (processedFiles.length + newFiles.length > 100) {
+                error.textContent = '累计文件数不能超过100个';
                 return;
             }
 
-            // 验证文件类型
-            const invalidFiles = files.filter(file => !file.name.toLowerCase().endsWith('.pdf'));
-            if (invalidFiles.length > 0) {
-                error.textContent = '请只上传PDF文件';
+            // 如果没有新文件要处理，直接返回
+            if (newFiles.length === 0) {
+                error.textContent = '这些文件已经处理过了';
                 return;
             }
 
-            // 发送文件名到服务器
-            const fileNames = files.map(file => file.name);
+            // 发送新文件名到服务器
+            const fileNames = newFiles.map(file => file.name);
             
             fetch('/process', {
                 method: 'POST',
@@ -155,25 +246,57 @@
                     return;
                 }
                 
+                // 添加新文件到已处理文件列表
+                processedFiles.push(...fileNames);
+                
+                // 更新文件计数
+                fileCount.textContent = processedFiles.length;
+                
                 // 显示结果
                 results.style.display = 'block';
                 
-                // 显示文件列表和金额
-                fileList.innerHTML = data.results.map(result => 
+                // 更新当前总金额
+                currentTotal += data.total;
+                
+                // 在文件列表中追加新文件
+                const newFileElements = data.results.map(result => 
                     `<div>文件：${result.filename} - 金额：${result.amount} 元</div>`
                 ).join('');
+                fileList.innerHTML += newFileElements;
                 
-                // 显示计算过程
-                calculation.textContent = data.calculation;
+                // 更新计算过程显示
+                const newCalculation = data.calculation.replace('=', '+');
+                if (calculation.textContent) {
+                    calculation.textContent += ' + ' + newCalculation;
+                } else {
+                    calculation.textContent = data.calculation;
+                }
                 
-                // 显示总金额
-                total.textContent = data.total.toFixed(2);
+                // 更新总金额显示
+                total.textContent = currentTotal.toFixed(2);
             })
             .catch(err => {
                 error.textContent = '处理文件时发生错误';
                 console.error(err);
             });
         }
+
+        // 重置功能
+        resetButton.addEventListener('click', () => {
+            // 重置所有变量
+            processedFiles = [];
+            currentTotal = 0;
+            
+            // 重置UI
+            fileList.innerHTML = '';
+            calculation.textContent = '';
+            total.textContent = '0.00';
+            fileCount.textContent = '0';
+            error.textContent = '';
+            
+            // 隐藏结果区域
+            results.style.display = 'none';
+        });
     </script>
 </body>
 </html>
