@@ -53,25 +53,50 @@
             color: #1976d2;
             font-size: 0.9em;
         }
+        .file-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
         .file-list {
             margin-top: 20px;
             max-height: 200px;
             overflow-y: auto;
         }
-        .calculation {
-            margin-top: 20px;
-            padding: 15px;
+        .calculation-box {
             background-color: #f8f9fa;
-            border-radius: 4px;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .total {
+        .calculation-process {
             font-size: 1.2em;
-            font-weight: bold;
-            color: #2196f3;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            line-height: 1.6;
+            word-wrap: break-word;
         }
-        .error {
-            color: #f44336;
-            margin-top: 10px;
+        .calculation-process-label {
+            font-weight: 600;
+            color: #1976d2;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .total-amount {
+            font-size: 1.8em;
+            color: #2c3e50;
+            font-weight: 700;
+            padding: 15px 0;
+            border-top: 2px solid #e0e0e0;
+            margin-top: 15px;
+        }
+        .total-amount-label {
+            color: #1976d2;
+            font-size: 0.7em;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-right: 10px;
         }
         .reset-button {
             background-color: #ff5252;
@@ -85,6 +110,100 @@
         }
         .reset-button:hover {
             background-color: #ff1744;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            margin: 4px 0;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            gap: 20px;
+        }
+        .file-name {
+            cursor: pointer;
+            color: #2196f3;
+            text-decoration: underline;
+            flex: 1;
+        }
+        .file-name:hover {
+            color: #1976d2;
+        }
+        .extracted-amount {
+            padding: 2px 8px;
+            background-color: #fff3f3;
+            border-radius: 4px;
+            border: 1px solid #ffcdd2;
+            min-width: 120px;
+            text-align: right;
+        }
+        .amount-highlight {
+            color: #ff4444;
+            font-weight: bold;
+        }
+        .amount-input {
+            width: 80px;
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: right;
+            margin-right: 4px;
+        }
+        .amount-input:focus {
+            border-color: #ff4444;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(255,68,68,0.2);
+        }
+        .manual-amount {
+            color: #ff4444;
+            font-style: italic;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            position: relative;
+            width: 80%;
+            height: 80%;
+            max-width: 1200px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            z-index: 1;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .file-preview {
+            width: 100%;
+            height: 100%;
+            border: none;
         }
     </style>
 </head>
@@ -101,15 +220,47 @@
             <div class="results-header">
                 <h2>提取结果</h2>
                 <div class="header-right">
-                    <div class="file-count">已处理文件数：<span id="fileCount">0</span></div>
-                    <button id="resetButton" class="reset-button">重置</button>
+                    <div class="file-actions">
+                        <div class="file-count">
+                            已处理文件数：<span id="fileCount">0</span>
+                            （成功：<span id="successFiles" style="color: #28a745;">0</span>
+                            失败：<span id="failedFilesCount" style="color: #dc3545;">0</span>）
+                        </div>
+                        <button id="resetButton" class="reset-button">重置</button>
+                    </div>
                 </div>
             </div>
-            <div id="fileList" class="file-list"></div>
-            <div class="calculation">
-                <p>计算过程：<span id="calculation"></span></p>
-                <p>总金额：<span id="total" class="total"></span> 元</p>
+            <div id="result" style="margin-top: 20px;">
+                <div class="calculation-box">
+                    <div class="calculation-process-label">计算过程</div>
+                    <div id="calculation" class="calculation-process"></div>
+                    <div class="total-amount">
+                        <span class="total-amount-label">总金额</span>
+                        <span id="total">0.00</span> 元
+                    </div>
+                </div>
+                
+                <div>
+                    <h3>成功提取的发票：</h3>
+                    <ul id="fileList" style="list-style: none; padding: 0;">
+                        <!-- 文件列表将在这里动态生成 -->
+                    </ul>
+                </div>
+                <div style="margin-top: 20px;">
+                    <h3>未能提取金额的发票：</h3>
+                    <ul id="failedFileList" style="list-style: none; padding: 0; color: #ff6b6b;">
+                        <!-- 失败的文件列表将在这里动态生成 -->
+                    </ul>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 添加模态窗口 -->
+    <div id="previewModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closePreviewModal()">&times;</button>
+            <iframe id="filePreview" class="file-preview"></iframe>
         </div>
     </div>
 
@@ -118,15 +269,98 @@
         const fileInput = document.getElementById('fileInput');
         const results = document.getElementById('results');
         const fileList = document.getElementById('fileList');
+        const failedFileList = document.getElementById('failedFileList');
         const calculation = document.getElementById('calculation');
         const total = document.getElementById('total');
         const error = document.getElementById('error');
         const fileCount = document.getElementById('fileCount');
         const resetButton = document.getElementById('resetButton');
+        const successFiles = document.getElementById('successFiles');
+        const failedFilesCount = document.getElementById('failedFilesCount');
 
         // 存储所有已处理的文件名
         let processedFiles = [];
         let currentTotal = 0;
+
+        // 存储手动输入的金额
+        let manualAmounts = {};
+        let autoAmounts = [];
+
+        // 存储初始的失败文件数量
+        let initialFailedCount = 0;
+
+        function updateTotal() {
+            // 计算自动识别的金额总和
+            const autoTotal = autoAmounts.reduce((sum, amount) => sum + amount, 0);
+            
+            // 计算手动输入的金额总和
+            const manualTotal = Object.values(manualAmounts).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0);
+            
+            // 更新显示
+            const calculationStr = [];
+            
+            // 添加自动识别的金额
+            if (autoAmounts.length > 0) {
+                calculationStr.push(autoAmounts.join(' + '));
+            }
+            
+            // 添加手动输入的金额
+            const manualAmountValues = Object.values(manualAmounts).filter(amount => amount && !isNaN(amount));
+            if (manualAmountValues.length > 0) {
+                if (calculationStr.length > 0) calculationStr.push('+');
+                calculationStr.push(`<span class="manual-amount">${manualAmountValues.join(' + ')}</span>`);
+            }
+            
+            calculation.innerHTML = calculationStr.join(' ');
+            total.textContent = (autoTotal + manualTotal).toFixed(2);
+        }
+
+        function updateStats() {
+            // 计算有效的手动输入金额数量
+            const validManualInputs = Object.values(manualAmounts).filter(amount => amount && !isNaN(amount) && amount > 0).length;
+            
+            // 更新成功文件数（自动识别成功 + 手动输入有效的数量）
+            const totalSuccess = autoAmounts.length + validManualInputs;
+            
+            // 更新失败文件数（初始失败数 - 手动输入有效的数量）
+            const totalFailed = Math.max(0, initialFailedCount - validManualInputs);
+            
+            // 更新显示
+            successFiles.textContent = totalSuccess;
+            failedFilesCount.textContent = totalFailed;
+        }
+
+        function handleManualAmountInput(event, filename) {
+            const input = event.target;
+            const value = input.value.trim();
+            
+            // 记录之前的状态
+            const hadValidAmount = manualAmounts[filename] && !isNaN(manualAmounts[filename]) && manualAmounts[filename] > 0;
+            
+            // 验证输入是否为有效数字
+            if (value === '' || /^\d+(\.\d{0,2})?$/.test(value)) {
+                const numValue = value === '' ? 0 : parseFloat(value);
+                manualAmounts[filename] = numValue;
+                
+                // 只在失去焦点时格式化为两位小数
+                if (event.type === 'change' && value !== '') {
+                    input.value = numValue.toFixed(2);
+                }
+                
+                updateTotal();
+                
+                // 检查当前状态
+                const hasValidAmount = numValue > 0;
+                
+                // 如果状态发生变化，更新统计信息
+                if (hadValidAmount !== hasValidAmount) {
+                    updateStats();
+                }
+            } else {
+                // 如果输入无效，恢复之前的值
+                input.value = manualAmounts[filename] ? manualAmounts[filename].toFixed(2) : '';
+            }
+        }
 
         // 处理拖拽事件
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -212,26 +446,24 @@
         }
 
         function processFiles(files) {
-            error.textContent = '';
-            
-            // 验证新添加的文件
-            const newFiles = files.filter(file => !processedFiles.includes(file.name));
-            
-            // 检查总文件数是否超过限制
-            if (processedFiles.length + newFiles.length > 100) {
-                error.textContent = '累计文件数不能超过100个';
+            if (files.length === 0) return;
+            if (files.length > 100) {
+                alert('最多只能上传100个文件');
                 return;
             }
 
-            // 如果没有新文件要处理，直接返回
-            if (newFiles.length === 0) {
-                error.textContent = '这些文件已经处理过了';
-                return;
-            }
-
-            // 发送新文件名到服务器
-            const fileNames = newFiles.map(file => file.name);
+            // 重置金额存储
+            manualAmounts = {};
+            autoAmounts = [];
             
+            const fileNames = Array.from(files).map(file => file.name);
+            
+            // 存储文件对象到全局变量
+            window.uploadedFiles = {};
+            Array.from(files).forEach(file => {
+                window.uploadedFiles[file.name] = file;
+            });
+
             fetch('/process', {
                 method: 'POST',
                 headers: {
@@ -243,59 +475,152 @@
             .then(data => {
                 if (data.error) {
                     error.textContent = data.error;
+                    error.style.display = 'block';
                     return;
                 }
-                
-                // 添加新文件到已处理文件列表
-                processedFiles.push(...fileNames);
-                
-                // 更新文件计数
-                fileCount.textContent = processedFiles.length;
-                
-                // 显示结果
+
+                // 更新统计信息
+                fileCount.textContent = data.stats.total_files;
+                successFiles.textContent = data.stats.success_files;
+                failedFilesCount.textContent = data.stats.failed_files;
+                // 存储初始失败数量
+                initialFailedCount = data.stats.failed_files;
+
+                // 清空列表
+                fileList.innerHTML = '';
+                failedFileList.innerHTML = '';
+
+                // 存储自动识别的金额
+                autoAmounts = data.results.map(result => result.amount);
+
+                // 添加成功的文件
+                data.results.forEach(result => {
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    
+                    const fileName = document.createElement('span');
+                    fileName.className = 'file-name';
+                    
+                    // 在文件名中查找并高亮显示金额
+                    const amountPattern = /(\d+(?:\.\d+)?)(元)/g;
+                    const highlightedFilename = result.filename.replace(amountPattern, '<span class="amount-highlight">$1$2</span>');
+                    
+                    fileName.innerHTML = highlightedFilename;
+                    fileName.onclick = () => previewFile(result.filename);
+                    
+                    // 创建识别金额元素，保持原始格式
+                    const extractedAmount = document.createElement('span');
+                    extractedAmount.className = 'extracted-amount';
+                    
+                    // 格式化金额，保持两位小数
+                    const formattedAmount = result.amount.toFixed(2);
+                    extractedAmount.innerHTML = `识别金额：<span class="amount-highlight">${formattedAmount}元</span>`;
+                    
+                    li.appendChild(fileName);
+                    li.appendChild(extractedAmount);
+                    fileList.appendChild(li);
+                });
+
+                // 添加失败的文件
+                data.failed_files.forEach(filename => {
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    
+                    const fileName = document.createElement('span');
+                    fileName.className = 'file-name';
+                    fileName.textContent = filename;
+                    fileName.onclick = () => previewFile(filename);
+                    
+                    const amountInput = document.createElement('div');
+                    amountInput.className = 'extracted-amount';
+                    amountInput.innerHTML = `
+                        <input type="text" 
+                               class="amount-input" 
+                               placeholder="输入金额"
+                               onchange="handleManualAmountInput(event, '${filename}')"
+                               onkeyup="handleManualAmountInput(event, '${filename}')"
+                               onblur="handleManualAmountInput(event, '${filename}')">元
+                    `;
+                    
+                    li.appendChild(fileName);
+                    li.appendChild(amountInput);
+                    failedFileList.appendChild(li);
+                });
+
+                updateTotal();
                 results.style.display = 'block';
-                
-                // 更新当前总金额
-                currentTotal += data.total;
-                
-                // 在文件列表中追加新文件
-                const newFileElements = data.results.map(result => 
-                    `<div>文件：${result.filename} - 金额：${result.amount} 元</div>`
-                ).join('');
-                fileList.innerHTML += newFileElements;
-                
-                // 更新计算过程显示
-                const newCalculation = data.calculation.replace('=', '+');
-                if (calculation.textContent) {
-                    calculation.textContent += ' + ' + newCalculation;
-                } else {
-                    calculation.textContent = data.calculation;
-                }
-                
-                // 更新总金额显示
-                total.textContent = currentTotal.toFixed(2);
             })
             .catch(err => {
-                error.textContent = '处理文件时发生错误';
-                console.error(err);
+                error.textContent = '处理文件时发生错误：' + err.message;
+                error.style.display = 'block';
             });
         }
+
+        // 文件预览函数
+        function previewFile(filename) {
+            const file = window.uploadedFiles[filename];
+            if (!file) {
+                alert('文件不存在');
+                return;
+            }
+            
+            // 创建一个临时的URL
+            const fileUrl = URL.createObjectURL(file);
+            
+            // 在模态窗口中显示文件
+            const modal = document.getElementById('previewModal');
+            const preview = document.getElementById('filePreview');
+            preview.src = fileUrl;
+            modal.style.display = 'flex';
+            
+            // 清理URL对象
+            preview.onload = () => {
+                URL.revokeObjectURL(fileUrl);
+            };
+        }
+
+        // 关闭模态窗口
+        function closePreviewModal() {
+            const modal = document.getElementById('previewModal');
+            const preview = document.getElementById('filePreview');
+            preview.src = '';
+            modal.style.display = 'none';
+        }
+
+        // 点击模态窗口外部时关闭
+        document.getElementById('previewModal').addEventListener('click', function(event) {
+            if (event.target === this) {
+                closePreviewModal();
+            }
+        });
+
+        // 按ESC键关闭模态窗口
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closePreviewModal();
+            }
+        });
 
         // 重置功能
         resetButton.addEventListener('click', () => {
             // 重置所有变量
             processedFiles = [];
+            window.uploadedFiles = {};
+            manualAmounts = {};
+            autoAmounts = [];
             currentTotal = 0;
+            initialFailedCount = 0;  // 重置初始失败数量
             
             // 重置UI
             fileList.innerHTML = '';
+            failedFileList.innerHTML = '';
             calculation.textContent = '';
             total.textContent = '0.00';
             fileCount.textContent = '0';
-            error.textContent = '';
-            
-            // 隐藏结果区域
+            successFiles.textContent = '0';
+            failedFilesCount.textContent = '0';
             results.style.display = 'none';
+            error.style.display = 'none';
         });
     </script>
 </body>
